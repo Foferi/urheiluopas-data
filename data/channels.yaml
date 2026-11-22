@@ -12,6 +12,7 @@ countries:
       - {id: viaplay, name: Viaplay, deepLink: "https://viaplay.fi"}
       - {id: hbo, name: HBO Max, deepLink: "https://www.hbomax.com"}
       - {id: kutonen, name: Kutonen, deepLink: "https://www.hbomax.com", free: true}
+      - {id: disney_plus, name: Disney+, deepLink: "https://www.disneyplus.com/fi-fi"}
   SE:
     name: {fi: Ruotsi, sv: Sverige, en: Sweden}
     timeZone: Europe/Stockholm
