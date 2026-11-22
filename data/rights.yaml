@@ -36,7 +36,7 @@ competitions:
     names: {fi: Liiga, sv: Liiga, en: Liiga}
     thesportsdb: {sport: Ice Hockey, league: Finnish Liiga}   # tarkista nimi --discover-komennolla
     broadcast: {FI: [mtv], SE: []}
-    source: https://www.sttinfo.fi/tiedote/72224908/suomi-kiekon-superkausi-alkaa-19-poimi-talteen-mtvn-ohjelmisto?lang=fi
+    source: https://www.mtv.fi/ohjelmat/liiga
     checked: 2026-11-22
 
   shl:

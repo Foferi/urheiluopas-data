@@ -2,7 +2,7 @@
 """
 Urheiluoppaan ohjelmatietojen rakentaja.
 
-Hakee otteluohjelmat (TheSportsDB, NHL ja Viaplay) ja käsin ylläpidetyt tapahtumat,
+Hakee otteluohjelmat (TheSportsDB, Katsomo, NHL ja Viaplay) ja käsin ylläpidetyt tapahtumat,
 liittää niihin lähetyskanavat oikeustaulukosta (data/rights.yaml) ja kirjoittaa staattiset
 JSON-tiedostot, joita sovellus lukee:
 
@@ -39,6 +39,9 @@ DATA = ROOT / "data"
 LANGS = ("fi", "sv", "en")
 DEFAULT_TZ = "Europe/Helsinki"
 TSDB_BASE = "https://www.thesportsdb.com/api/v1/json"
+KATSOMO_LIIGA_PANEL = "55SV6AGGC0BmnIEaqigd96"
+KATSOMO_PANEL_QUERY = "9ff092585150e045a6b98a87ec217b3447b98818c7384081f916c029a6b1caf8"
+KATSOMO_CLIENT_VERSION = "5.5.0"
 NHL_SCHEDULE = "https://api-web.nhle.com/v1/schedule"
 NHL_VIAPLAY = {
     "FI": ("viaplay", "https://content.viaplay.fi/pcdash-fi/urheilu/jaakiekko/nhl?language=fi",
@@ -140,10 +143,92 @@ def fetch_provider_events(rights: dict, days: list[date]) -> list[Event]:
     return out
 
 
-def load_json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "urheiluopas-data/1.0"})
+def load_json(url: str, headers: dict[str, str] | None = None) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "urheiluopas-data/1.0", **(headers or {})})
     with urllib.request.urlopen(request, timeout=20) as response:
         return json.load(response)
+
+
+def katsomo_liiga_cards() -> list[dict]:
+    cards = []
+    offset = 0
+    while True:
+        query = urllib.parse.urlencode({
+            "operationName": "Panel",
+            "variables": json.dumps({
+                "panelId": KATSOMO_LIIGA_PANEL, "limit": 20, "offset": offset, "includeProgress": False,
+            }),
+            "extensions": json.dumps({"persistedQuery": {"version": 1, "sha256Hash": KATSOMO_PANEL_QUERY}}),
+        })
+        response = load_json(f"https://nordic-gateway.mtv.a2d.tv/graphql?{query}", {
+            "client-name": "mtv-web", "client-version": KATSOMO_CLIENT_VERSION,
+            "Origin": "https://www.mtv.fi",
+        })
+        if response.get("errors"):
+            raise ValueError(response["errors"][0]["message"])
+        content = response["data"]["panel"]["content"]
+        cards.extend(card["content"] for card in content["cards"])
+        page = content["pageInfo"]
+        if not page["hasNextPage"]:
+            if len(cards) != page["totalCount"]:
+                raise ValueError("Katsomon ottelulistasta puuttuu sivu")
+            return cards
+        if page["nextPageOffset"] <= offset:
+            raise ValueError("Katsomon ottelulistan sivutus ei edennyt")
+        offset = page["nextPageOffset"]
+
+
+def reconcile_liiga(events: dict[str, Event], today: date) -> None:
+    zone = ZoneInfo(DEFAULT_TZ)
+
+    def key(event: Event) -> tuple[date, str, str]:
+        return event.start.astimezone(zone).date(), norm(event.home), norm(event.away)
+
+    confirmed: dict[tuple[date, str, str], Event] = {}
+    cards = katsomo_liiga_cards()
+    for card in cards:
+        if not card or card.get("league") != "Liiga" or not card.get("isLiveContent"):
+            continue
+        home, separator, away = card["title"].partition(" - ")
+        if not separator:
+            continue
+        home = "Kiekko-Espoo" if home == "K-Espoo" else home
+        away = "Kiekko-Espoo" if away == "K-Espoo" else away
+        live = next((label for label in card["labels"] if label["style"] == "LIVE"), None)
+        starts = live["displayFrom"] if live else card["playableFrom"]
+        start = datetime.fromisoformat(starts["isoString"])
+        item = Event("liiga", start, home, away, source="katsomo", channel_starts={"mtv": start})
+        match_key = key(item)
+        if match_key not in confirmed or start < confirmed[match_key].start:
+            confirmed[match_key] = item
+
+    if not confirmed:
+        if cards:
+            raise ValueError("Katsomon Liiga-listasta ei löytynyt yhtään tunnistettua ottelua")
+        print("Katsomon Liiga-lista on tyhjä.")
+        return
+
+    last_listed_day = max(match_key[0] for match_key in confirmed)
+    covered_days = {match_key[0] for match_key in confirmed if today < match_key[0] < last_listed_day}
+    for event_key, event in list(events.items()):
+        if event.competition != "liiga":
+            continue
+        match_key = key(event)
+        verified = confirmed.pop(match_key, None)
+        if verified:
+            event.channel_starts["mtv"] = verified.start
+        elif match_key[0] in covered_days:
+            print(f"  ! Liiga {match_key[0]}: ei Katsomon listalla: {event.home} - {event.away}")
+            del events[event_key]
+
+    for event in confirmed.values():
+        event.note = {
+            "fi": "Listattu aika on Katsomo-lähetyksen alkamisaika.",
+            "sv": "Tiden avser sändningsstarten på Katsomo.",
+            "en": "The listed time is the start of the Katsomo broadcast.",
+        }
+        events[event.key()] = event
+    print(f"Katsomo: vahvistettu Liigan ohjelma, täydennetty {len(confirmed)} ottelua.")
 
 
 def nhl_games(first: date, last: date) -> list[dict]:
@@ -243,6 +328,10 @@ def manual_events(manual: dict) -> list[Event]:
             competition=m["competition"], start=start,
             home=m.get("home", ""), away=m.get("away", ""),
             title=m.get("title"), duration=m.get("duration"),
+            channel_starts={
+                channel: datetime.fromisoformat(value).replace(tzinfo=tz).astimezone(timezone.utc)
+                for channel, value in (m.get("channelStarts") or {}).items()
+            },
         ))
     return out
 
@@ -309,8 +398,13 @@ def build(out: Path, days_ahead: int, fetch: bool) -> None:
         previous = events.get(e.key())
         if previous and previous.competition == "nhl":
             e.extra_channels = previous.extra_channels
-            e.channel_starts = previous.channel_starts
+            e.channel_starts = previous.channel_starts | e.channel_starts
         events[e.key()] = e
+    if fetch and "liiga" in rights:
+        try:
+            reconcile_liiga(events, today)
+        except (OSError, ValueError, KeyError, TypeError) as err:
+            sys.exit(f"Katsomon Liiga-ohjelman tarkistus epäonnistui: {err}")
     unknown = {e.competition for e in events.values()} - set(rights)
     if unknown:
         sys.exit(f"Tuntematon kilpailu manual.yaml:ssa: {', '.join(sorted(unknown))}")

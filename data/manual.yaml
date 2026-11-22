@@ -37,7 +37,14 @@ events:
   - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Frölunda, away: Björklöven}
   - {competition: liiga, start: "2026-11-27T19:30", home: HIFK, away: SaiPa}
   - {competition: pl, start: "2026-11-27T22:00", home: Nottingham Forest, away: Chelsea}
-  - {competition: liiga, start: "2026-11-28T17:00", home: Ässät, away: Pelicans}
+  # 28.11. lähetykset: https://www.mtv.fi/lista/55SV6AGGC0BmnIEaqigd96
+  - {competition: liiga, start: "2026-11-28T17:00", home: Ilves, away: HIFK, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: Jukurit, away: Lukko, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: JYP, away: KalPa, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: Pelicans, away: KooKoo, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: SaiPa, away: Jokerit, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: TPS, away: Kiekko-Espoo, channelStarts: {mtv: "2026-11-28T16:30"}}
+  - {competition: liiga, start: "2026-11-28T17:00", home: Ässät, away: Kärpät, channelStarts: {mtv: "2026-11-28T16:30"}}
   - {competition: pl, start: "2026-11-28T17:00", home: Leeds United, away: Coventry City}
   - {competition: pl, start: "2026-11-28T17:00", home: Manchester United, away: Brentford}
   - {competition: pl, start: "2026-11-28T19:30", home: Ipswich Town, away: Aston Villa}
