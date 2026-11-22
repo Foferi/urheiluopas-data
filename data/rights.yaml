@@ -1,0 +1,90 @@
+# Lähetysoikeudet: kilpailu × maa -> kanavat.
+# Oikeudet myydään yleensä sarjoittain ja kausittain, joten tämä taulukko kattaa valtaosan lähetyksistä.
+# Ottelukohtaiset poikkeukset (esim. maksuton lisälähetys) ovat tiedostossa manual.yaml (overrides).
+#
+# thesportsdb.league = sarjan nimi TheSportsDB:ssä (strLeague). Tarkista nimet komennolla:
+#   python scripts/build.py --discover Soccer --date 2026-11-22
+# Jos nimeä ei ole (league: null), otteluohjelma tulee vain manual.yaml-tiedostosta.
+
+competitions:
+  pl:
+    sport: football
+    type: club
+    duration: 110
+    names: {fi: Valioliiga, sv: Premier League, en: Premier League}
+    thesportsdb: {sport: Soccer, league: English Premier League}
+    broadcast: {FI: [viaplay], SE: [viaplay_se]}
+    note:
+      SE: {fi: "Ruotsissa osa Valioliigan otteluista näkyy Viaplayn sijaan Prime Videossa.", sv: "I Sverige visas en del Premier League-matcher på Prime Video i stället för Viaplay.", en: "In Sweden, some Premier League matches are on Prime Video instead of Viaplay."}
+    source: https://www.valioliiga.com/televisiointi-viaplay-mtv-tv/
+    checked: 2026-11-22
+
+  ucl:
+    sport: football
+    type: club
+    duration: 110
+    names: {fi: Mestarien liiga, sv: Champions League, en: Champions League}
+    thesportsdb: {sport: Soccer, league: UEFA Champions League}
+    broadcast: {FI: [mtv], SE: [viaplay_se]}
+    source: https://www.suomifutis.com/mestarien-liiga/
+    checked: 2026-11-22
+
+  liiga:
+    sport: ice_hockey
+    type: club
+    duration: 150
+    names: {fi: Liiga, sv: Liiga, en: Liiga}
+    thesportsdb: {sport: Ice Hockey, league: Finnish Liiga}   # tarkista nimi --discover-komennolla
+    broadcast: {FI: [mtv], SE: []}
+    source: https://www.sttinfo.fi/tiedote/72224908/suomi-kiekon-superkausi-alkaa-19-poimi-talteen-mtvn-ohjelmisto?lang=fi
+    checked: 2026-11-22
+
+  shl:
+    sport: ice_hockey
+    type: club
+    duration: 150
+    names: {fi: SHL, sv: SHL, en: SHL}
+    thesportsdb: {sport: Ice Hockey, league: Swedish Hockey League}   # tarkista nimi --discover-komennolla
+    broadcast: {FI: [], SE: [tv4]}
+    source: https://www.tvsporten.nu/tv-rattigheter-for-sport-i-sverige
+    checked: 2026-11-22
+
+  biathlon_wc:
+    sport: skiing
+    type: individual
+    duration: 75
+    names: {fi: Ampumahiihdon maailmancup, sv: Världscupen i skidskytte, en: Biathlon World Cup}
+    thesportsdb: {league: null}
+    broadcast: {FI: [yle], SE: [svt]}
+    source: https://www.suomiurheilu.com/ampumahiihdon-maailmancup-2026-27/
+    checked: 2026-11-22
+
+  xc_wc:
+    sport: skiing
+    type: individual
+    duration: 70
+    names: {fi: Hiihdon maailmancup, sv: Världscupen i längdskidor, en: Cross-Country World Cup}
+    thesportsdb: {league: null}
+    broadcast: {FI: [yle, viaplay], SE: [viaplay_se]}   # SE: Ruotsissa järjestettävät osakilpailut myös SVT
+    source: https://suomenurheilu.fi/hiihdon-maailmancup-2026-2027/
+    checked: 2026-11-22
+
+  darts_pdc:
+    sport: darts
+    type: individual
+    duration: 240
+    names: {fi: PDC Darts, sv: PDC Dart, en: PDC Darts}
+    thesportsdb: {sport: Darts, league: null}   # lisää nimi, kun se on tarkistettu --discover Darts
+    broadcast: {FI: [viaplay], SE: [viaplay_se]}
+    source: https://etusuora.com/live-stream/darts
+    checked: 2026-11-22
+
+  snooker_wst:
+    sport: snooker
+    type: individual
+    duration: 240
+    names: {fi: Snooker (WST), sv: Snooker (WST), en: Snooker (WST)}
+    thesportsdb: {sport: Snooker, league: null}   # lisää nimi, kun se on tarkistettu --discover Snooker
+    broadcast: {FI: [hbo], SE: [hbo_se]}          # Eurosport / HBO Max
+    source: https://en.wikipedia.org/wiki/2026_Welsh_Open_(snooker)
+    checked: 2026-11-22

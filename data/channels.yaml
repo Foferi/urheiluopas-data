@@ -1,0 +1,23 @@
+# Kanavat ja palvelut maittain. deepLink avaa palvelun (sovellus, jos se on asennettu, muuten selain).
+# free: true = maksuton kanava (sovellus näyttää "Avaa", ei kumppanilinkkiä).
+countries:
+  FI:
+    name: {fi: Suomi, sv: Finland, en: Finland}
+    timeZone: Europe/Helsinki
+    defaultLanguage: fi
+    channels:
+      - {id: yle, name: Yle Areena, deepLink: "https://areena.yle.fi", free: true}
+      - {id: mtv, name: MTV Katsomo, deepLink: "https://www.mtv.fi"}
+      - {id: ruutu, name: Ruutu, deepLink: "https://www.ruutu.fi"}
+      - {id: viaplay, name: Viaplay, deepLink: "https://viaplay.fi"}
+      - {id: hbo, name: HBO Max, deepLink: "https://www.hbomax.com"}
+      - {id: kutonen, name: Kutonen, deepLink: "https://www.hbomax.com", free: true}
+  SE:
+    name: {fi: Ruotsi, sv: Sverige, en: Sweden}
+    timeZone: Europe/Stockholm
+    defaultLanguage: sv
+    channels:
+      - {id: svt, name: SVT Play, deepLink: "https://www.svtplay.se", free: true}
+      - {id: tv4, name: TV4 Play, deepLink: "https://www.tv4play.se"}
+      - {id: viaplay_se, name: Viaplay, deepLink: "https://viaplay.se"}
+      - {id: hbo_se, name: HBO Max, deepLink: "https://www.hbomax.com"}

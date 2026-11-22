@@ -1,0 +1,82 @@
+# Käsin ylläpidettävät tapahtumat ja poikkeukset.
+#
+# events: tapahtumat, joita otteluohjelmalähde ei kata (yksilölajit, darts- ja snooker-sessiot)
+#   tai jotka halutaan varmistaa. Jos sama ottelu tulee myös lähteestä, käytetään tätä.
+#   start = paikallinen aika muodossa YYYY-MM-DDTHH:MM, aikavyöhyke tz (oletus Europe/Helsinki).
+#   Joukkuelaji: home + away. Yksilölaji / sessio: title {fi, sv, en}.
+#
+# overrides: lisäkanavat tai huomautukset, jotka liitetään sääntöön osuviin tapahtumiin.
+
+events:
+  # --- Tilannekuva 22.–28.11.2026 (lähteet: liiga.fi, premierleague.com, uefa.com, rukanordic.com) ---
+  - {competition: pl, start: "2026-11-22T16:00", home: Hull City, away: Brighton}
+  - {competition: pl, start: "2026-11-22T18:30", home: Liverpool, away: Manchester United}
+  - {competition: pl, start: "2026-11-23T22:00", home: Brentford, away: Everton}
+  - {competition: liiga, start: "2026-11-24T18:30", home: Ilves, away: Ässät}
+  - {competition: liiga, start: "2026-11-24T18:30", home: SaiPa, away: Lukko}
+  - {competition: liiga, start: "2026-11-24T18:30", home: Sport, away: Kiekko-Espoo}
+  - {competition: ucl, start: "2026-11-24T19:45", home: Galatasaray, away: Aston Villa}
+  - {competition: ucl, start: "2026-11-24T22:00", home: Arsenal, away: Borussia Dortmund}
+  - {competition: ucl, start: "2026-11-24T22:00", home: Manchester City, away: Napoli}
+  - {competition: ucl, start: "2026-11-24T22:00", home: Real Madrid, away: PSV}
+  - {competition: liiga, start: "2026-11-25T18:30", home: HIFK, away: TPS}
+  - {competition: liiga, start: "2026-11-25T18:30", home: Jokerit, away: KooKoo}
+  - {competition: liiga, start: "2026-11-25T18:30", home: Kärpät, away: Pelicans}
+  - {competition: liiga, start: "2026-11-25T18:30", home: Tappara, away: Jukurit}
+  - {competition: ucl, start: "2026-11-25T19:45", home: Sabah, away: Barcelona}
+  - {competition: ucl, start: "2026-11-25T22:00", home: Club Brugge, away: Liverpool}
+  - {competition: ucl, start: "2026-11-25T22:00", home: PSG, away: Roma}
+  - {competition: ucl, start: "2026-11-25T22:00", home: Lille, away: Bayern München}
+  - {competition: ucl, start: "2026-11-25T22:00", home: Sporting, away: Manchester United}
+  - {competition: liiga, start: "2026-11-26T18:30", home: Sport, away: Ilves}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Örebro, away: HV71}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Linköping, away: Brynäs}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Timrå, away: Färjestad}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Skellefteå, away: Rögle}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Växjö, away: Djurgården}
+  - {competition: shl, start: "2026-11-26T19:00", tz: Europe/Stockholm, home: Frölunda, away: Björklöven}
+  - {competition: liiga, start: "2026-11-27T19:30", home: HIFK, away: SaiPa}
+  - {competition: pl, start: "2026-11-27T22:00", home: Nottingham Forest, away: Chelsea}
+  - {competition: liiga, start: "2026-11-28T17:00", home: Ässät, away: Pelicans}
+  - {competition: pl, start: "2026-11-28T17:00", home: Leeds United, away: Coventry City}
+  - {competition: pl, start: "2026-11-28T17:00", home: Manchester United, away: Brentford}
+  - {competition: pl, start: "2026-11-28T19:30", home: Ipswich Town, away: Aston Villa}
+
+  - competition: biathlon_wc
+    start: "2026-11-26T17:15"
+    title: {fi: "Kontiolahti: miesten normaalikilpailu 20 km", sv: "Kontiolahti: distans 20 km, herrar", en: "Kontiolahti: men’s 20 km individual"}
+  - competition: biathlon_wc
+    start: "2026-11-27T17:15"
+    title: {fi: "Kontiolahti: naisten normaalikilpailu 15 km", sv: "Kontiolahti: distans 15 km, damer", en: "Kontiolahti: women’s 15 km individual"}
+  - competition: biathlon_wc
+    start: "2026-11-28T14:10"
+    title: {fi: "Kontiolahti: parisekaviesti", sv: "Kontiolahti: singelmixed", en: "Kontiolahti: single mixed relay"}
+  - competition: biathlon_wc
+    start: "2026-11-28T16:15"
+    title: {fi: "Kontiolahti: sekaviesti", sv: "Kontiolahti: mixedstafett", en: "Kontiolahti: mixed relay"}
+  - competition: xc_wc
+    start: "2026-11-27T11:30"
+    title: {fi: "Ruka: naisten 10 km (p)", sv: "Ruka: 10 km klassisk, damer", en: "Ruka: women’s 10 km classic"}
+  - competition: xc_wc
+    start: "2026-11-27T14:00"
+    title: {fi: "Ruka: miesten 10 km (p)", sv: "Ruka: 10 km klassisk, herrar", en: "Ruka: men’s 10 km classic"}
+  - competition: xc_wc
+    start: "2026-11-28T09:45"
+    title: {fi: "Ruka: sprintti (p), karsinta", sv: "Ruka: sprint klassisk, kval", en: "Ruka: classic sprint, qualification"}
+  - competition: xc_wc
+    start: "2026-11-28T12:15"
+    title: {fi: "Ruka: sprintti (p), finaalit", sv: "Ruka: sprint klassisk, finaler", en: "Ruka: classic sprint, finals"}
+
+  # --- Darts ja snooker: sessiot lisätään tähän turnauskohtaisesti ---
+  - competition: darts_pdc
+    start: "2026-11-22T14:00"
+    duration: 420
+    title: {fi: "Grand Slam of Darts: välierät ja finaali", sv: "Grand Slam of Darts: semifinaler och final", en: "Grand Slam of Darts: semi-finals and final"}
+
+overrides:
+  - match: {competition: liiga, date: "2026-11-27", home: HIFK, away: SaiPa}
+    addChannels: {FI: [mtv]}
+    note: {fi: "Myös maksuttomalla MTV3-kanavalla.", sv: "Även på den fria kanalen MTV3.", en: "Also on free-to-air MTV3."}
+  - match: {competition: snooker_wst, from: "2026-12-04", to: "2026-12-06", titleContains: "UK Championship"}
+    addChannels: {FI: [kutonen]}
+    note: {fi: "Ratkaisuhetket myös maksuttomalla Kutosella.", sv: "Avgörandena även på finska fria kanalen Kutonen.", en: "Deciding matches also on free-to-air Kutonen (Finland)."}
