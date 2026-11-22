@@ -49,6 +49,15 @@ competitions:
     source: https://www.tvsporten.nu/tv-rattigheter-for-sport-i-sverige
     checked: 2026-11-22
 
+  nhl:
+    sport: ice_hockey
+    type: club
+    duration: 180
+    names: {fi: NHL, sv: NHL, en: NHL}
+    # Kanavat lisätään ottelukohtaisesti Viaplayn maakohtaisesta ohjelmasta.
+    broadcast: {FI: [], SE: []}
+    source: https://www.nhl.com/fi/news/nhl-nakyy-suomessa-jatkossakin-viaplayssa
+
   biathlon_wc:
     sport: skiing
     type: individual

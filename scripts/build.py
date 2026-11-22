@@ -2,7 +2,7 @@
 """
 Urheiluoppaan ohjelmatietojen rakentaja.
 
-Hakee otteluohjelmat (TheSportsDB) ja käsin ylläpidetyt tapahtumat (data/manual.yaml),
+Hakee otteluohjelmat (TheSportsDB, NHL ja Viaplay) ja käsin ylläpidetyt tapahtumat,
 liittää niihin lähetyskanavat oikeustaulukosta (data/rights.yaml) ja kirjoittaa staattiset
 JSON-tiedostot, joita sovellus lukee:
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import unicodedata
 import urllib.error
@@ -38,6 +39,13 @@ DATA = ROOT / "data"
 LANGS = ("fi", "sv", "en")
 DEFAULT_TZ = "Europe/Helsinki"
 TSDB_BASE = "https://www.thesportsdb.com/api/v1/json"
+NHL_SCHEDULE = "https://api-web.nhle.com/v1/schedule"
+NHL_VIAPLAY = {
+    "FI": ("viaplay", "https://content.viaplay.fi/pcdash-fi/urheilu/jaakiekko/nhl?language=fi",
+           "Tämänhetkiset lähetykset"),
+    "SE": ("viaplay_se", "https://content.viaplay.se/pcdash-se/sport/ishockey/nhl?language=sv",
+           "Aktuella sändningar"),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +63,7 @@ class Event:
     source: str = "manual"
     extra_channels: dict[str, list[str]] = field(default_factory=dict)
     note: dict[str, str] | None = None
+    channel_starts: dict[str, datetime] = field(default_factory=dict)
 
     def key(self) -> str:
         """Tunniste, jolla sama tapahtuma tunnistetaan eri lähteistä."""
@@ -131,6 +140,100 @@ def fetch_provider_events(rights: dict, days: list[date]) -> list[Event]:
     return out
 
 
+def load_json(url: str) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "urheiluopas-data/1.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
+
+
+def nhl_games(first: date, last: date) -> list[dict]:
+    games = {}
+    day = first
+    while day <= last:
+        week = load_json(f"{NHL_SCHEDULE}/{day.isoformat()}")
+        if not week["gameWeek"]:
+            raise ValueError(f"NHL:n ohjelmasta puuttuu viikko {day}")
+        for slate in week["gameWeek"]:
+            for game in slate["games"]:
+                if game.get("gameScheduleState") == "OK" and game["gameType"] in (2, 3):
+                    games[game["id"]] = game
+        next_day = date.fromisoformat(week["nextStartDate"])
+        if next_day <= day:
+            raise ValueError("NHL:n ohjelman sivutus ei edennyt")
+        day = next_day
+    return list(games.values())
+
+
+def viaplay_products(url: str, title: str) -> list[dict]:
+    blocks = load_json(url)["_embedded"]["viaplay:blocks"]
+    block = next((item for item in blocks if item.get("title") == title), None)
+    if block is None:
+        raise ValueError(f"Viaplayn ohjelmalista puuttuu ({url})")
+    products = []
+    visited = {url}
+    while True:
+        products.extend(block["_embedded"]["viaplay:products"])
+        next_url = block.get("_links", {}).get("next", {}).get("href")
+        if not next_url:
+            return products
+        if next_url in visited or urllib.parse.urlsplit(next_url).hostname != urllib.parse.urlsplit(url).hostname:
+            raise ValueError(f"Viaplayn ohjelmalistan sivutus on virheellinen ({url})")
+        visited.add(next_url)
+        block = load_json(next_url)
+
+
+def nhl_team(team: dict) -> tuple[str, set[str]]:
+    place = team["placeName"]["default"]
+    nickname = team["commonName"]["default"]
+    name = f"{place} {nickname}"
+    aliases = {place, nickname, name, team["abbrev"]}
+    if place == "New York":
+        aliases = {nickname, name, team["abbrev"], f"NY {nickname}"}
+    return name, {norm(alias) for alias in aliases}
+
+
+def fetch_nhl_events(days: list[date]) -> list[Event]:
+    games = nhl_games(days[0] - timedelta(days=1), days[-1] + timedelta(days=1))
+    candidates = []
+    for game in games:
+        home, home_aliases = nhl_team(game["homeTeam"])
+        away, away_aliases = nhl_team(game["awayTeam"])
+        start = datetime.fromisoformat(game["startTimeUTC"])
+        event = Event("nhl", start, home, away, source="nhl_viaplay")
+        candidates.append((event, home_aliases, away_aliases))
+
+    for country, (channel, url, title) in NHL_VIAPLAY.items():
+        unmatched = []
+        for product in viaplay_products(url, title):
+            if product.get("type") != "sport":
+                continue
+            label = product["content"]["title"]
+            parts = re.split(r"\s+[-–—]\s+", re.sub(r"\s*\([^()]*\)\s*$", "", label), maxsplit=1)
+            if len(parts) != 2:
+                continue
+            epg = product["epg"]
+            broadcast_start = datetime.fromisoformat(epg.get("streamStart") or epg["start"])
+            left, right = map(norm, parts)
+            matches = [
+                event for event, home, away in candidates
+                if abs(event.start - broadcast_start) <= timedelta(hours=2)
+                and ((left in home and right in away) or (left in away and right in home))
+            ]
+            if len(matches) != 1:
+                if days[0] <= broadcast_start.date() <= days[-1]:
+                    unmatched.append(label)
+                continue
+            event = matches[0]
+            channels = event.extra_channels.setdefault(country, [])
+            if channel not in channels:
+                channels.append(channel)
+            event.channel_starts[channel] = min(broadcast_start, event.channel_starts.get(channel, broadcast_start))
+        if unmatched:
+            print(f"  ! NHL {country}: lähetykselle ei löytynyt yksiselitteistä ottelua: {', '.join(unmatched)}",
+                  file=sys.stderr)
+    return [event for event, _, _ in candidates if event.extra_channels]
+
+
 def manual_events(manual: dict) -> list[Event]:
     out = []
     for m in manual.get("events") or []:
@@ -196,7 +299,17 @@ def build(out: Path, days_ahead: int, fetch: bool) -> None:
     if fetch:
         for e in fetch_provider_events(rights, days):
             events[e.key()] = e
+        if "nhl" in rights:
+            try:
+                for e in fetch_nhl_events(days):
+                    events[e.key()] = e
+            except (OSError, ValueError, KeyError, TypeError) as err:
+                sys.exit(f"NHL:n ohjelmatietojen haku epäonnistui: {err}")
     for e in manual_events(manual):          # käsin syötetty voittaa lähteen
+        previous = events.get(e.key())
+        if previous and previous.competition == "nhl":
+            e.extra_channels = previous.extra_channels
+            e.channel_starts = previous.channel_starts
         events[e.key()] = e
     unknown = {e.competition for e in events.values()} - set(rights)
     if unknown:
@@ -249,8 +362,9 @@ def build(out: Path, days_ahead: int, fetch: bool) -> None:
                 "source": e.source,
             })
             for c in chans:
+                broadcast_start = e.channel_starts.get(c, e.start)
                 day["broadcasts"].append({"matchId": mid, "channelId": c, "countryCode": code,
-                                          "startTimeUtc": e.start.isoformat().replace("+00:00", "Z"), "isLive": True})
+                                          "startTimeUtc": broadcast_start.isoformat().replace("+00:00", "Z"), "isLive": True})
         for d in days:
             iso = d.isoformat()
             content = per_day.get(iso, {"matches": [], "broadcasts": []})
@@ -278,7 +392,7 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--out", type=Path, default=ROOT / "public")
     p.add_argument("--days", type=int, default=7, help="montako päivää eteenpäin")
-    p.add_argument("--no-fetch", action="store_true", help="älä hae TheSportsDB:stä")
+    p.add_argument("--no-fetch", action="store_true", help="käytä vain käsin ylläpidettyjä ohjelmatietoja")
     p.add_argument("--discover", metavar="SPORT", help="listaa lähteen sarjanimet, esim. Soccer, Darts, Snooker")
     p.add_argument("--date", type=date.fromisoformat, default=date.today())
     a = p.parse_args()
