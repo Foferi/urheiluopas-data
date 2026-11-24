@@ -2,7 +2,7 @@
 """
 Urheiluoppaan ohjelmatietojen rakentaja.
 
-Hakee otteluohjelmat (TheSportsDB, Katsomo, NHL ja Viaplay) ja käsin ylläpidetyt tapahtumat,
+Hakee otteluohjelmat ja lähetykset (TheSportsDB, Katsomo, NHL, Viaplay ja HBO Max),
 liittää niihin lähetyskanavat oikeustaulukosta (data/rights.yaml) ja kirjoittaa staattiset
 JSON-tiedostot, joita sovellus lukee:
 
@@ -67,9 +67,12 @@ class Event:
     extra_channels: dict[str, list[str]] = field(default_factory=dict)
     note: dict[str, str] | None = None
     channel_starts: dict[str, datetime] = field(default_factory=dict)
+    tournament: str = ""                # automaattisen snooker- tai dartssession nimi
 
     def key(self) -> str:
         """Tunniste, jolla sama tapahtuma tunnistetaan eri lähteistä."""
+        if self.tournament:
+            return f"{self.competition}|{self.start.isoformat()}|{norm(self.tournament)}"
         label = f"{self.home}|{self.away}" if self.home else (self.title or {}).get("en", "")
         return f"{self.competition}|{self.start.date().isoformat()}|{norm(label)}"
 
@@ -319,6 +322,87 @@ def fetch_nhl_events(days: list[date]) -> list[Event]:
     return [event for event, _, _ in candidates if event.extra_channels]
 
 
+def viaplay_darts_sessions(url: str, block_title: str):
+    for product in viaplay_products(url, block_title):
+        if product.get("type") != "sport":
+            continue
+        content, epg = product["content"], product.get("epg") or {}
+        yield content.get("title"), epg.get("streamStart") or epg.get("start"), (
+            epg.get("streamEnd") or epg.get("end")
+        ), (content.get("originalTitle") or "").split("|", 1)[0].strip()
+
+
+def hbo_snooker_sessions(url: str, _block_title: str):
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        html = response.read().decode("utf-8")
+    script = re.search(r'<script\b[^>]*\bid="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    if not script:
+        raise ValueError("HBO Maxin ohjelmatiedot puuttuvat sivulta")
+    blocks = json.loads(script[1])["props"]["pageProps"]["mappedData"]
+    for block in blocks.values():
+        if not isinstance(block, dict):
+            continue
+        if (block.get("title") or {}).get("full") != "EMEA | Snooker | Live and Upcoming":
+            continue
+        for item in block["items"]:
+            if item.get("sport") != "Snooker" or item.get("eventStatus") not in {"live", "upcoming", "scheduled"}:
+                continue
+            dates = item.get("scheduleDates") or {}
+            short_title = (item.get("title") or {}).get("short") or ""
+            yield item.get("league"), dates.get("startDate"), dates.get("endDate"), short_title.partition("|")[2].strip()
+
+
+def fetch_broadcast_sessions(days: list[date]) -> list[Event]:
+    feeds = [
+        ("darts_pdc", "FI", "viaplay", viaplay_darts_sessions,
+         "https://content.viaplay.fi/pcdash-fi/urheilu/darts/pdc-darts?language=fi", "Tämänhetkiset lähetykset"),
+        ("darts_pdc", "SE", "viaplay_se", viaplay_darts_sessions,
+         "https://content.viaplay.se/pcdash-se/sport/dart/pdc-dart?language=sv", "Aktuella sändningar"),
+        ("snooker_wst", "FI", "hbo", hbo_snooker_sessions, "https://www.hbomax.com/fi/fi/sports/snooker", ""),
+        ("snooker_wst", "SE", "hbo_se", hbo_snooker_sessions, "https://www.hbomax.com/se/sv/sports/snooker", ""),
+    ]
+    sessions: list[Event] = []
+    for competition, country, channel, fetch, url, block in feeds:
+        zone = ZoneInfo({"FI": DEFAULT_TZ, "SE": "Europe/Stockholm"}[country])
+        try:
+            listings = list(fetch(url, block))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as err:
+            print(f"  ! {country} {competition}: lähetyslistan haku epäonnistui: {err}", file=sys.stderr)
+            continue
+        for name, starts_at, ends_at, phase in listings:
+            if not (name and starts_at and ends_at):
+                continue
+            try:
+                start = datetime.fromisoformat(starts_at)
+                end = datetime.fromisoformat(ends_at)
+                if start.tzinfo is None or end.tzinfo is None or end <= start:
+                    continue
+            except (ValueError, TypeError):
+                continue
+            start = (start.astimezone(timezone.utc) + timedelta(seconds=30)).replace(second=0, microsecond=0)
+            if start.astimezone(zone).date() not in days:
+                continue
+            duration = max(1, round((end - start).total_seconds() / 60))
+            event = next((event for event in sessions if event.competition == competition
+                          and norm(event.tournament) == norm(name)
+                          and abs(event.start - start) <= timedelta(minutes=5)), None)
+            if event is None:
+                title = {lang: name for lang in LANGS}
+                event = Event(competition, start, title=title, duration=duration,
+                              source="viaplay" if competition == "darts_pdc" else "hbo_max", tournament=name)
+                sessions.append(event)
+            if phase:
+                event.title[country.lower()] = f"{name} – {phase}"
+                if phase.casefold() in {"karsinta", "kval"}:
+                    event.title["en"] = f"{name} – qualifying"
+            event.duration = max(event.duration, duration)
+            event.extra_channels[country] = [channel]
+            event.channel_starts[channel] = min(start, event.channel_starts.get(channel, start))
+        print(f"{country} {competition}: {sum(country in e.extra_channels and e.competition == competition for e in sessions)} sessiota.")
+    return sessions
+
+
 def manual_events(manual: dict) -> list[Event]:
     out = []
     for m in manual.get("events") or []:
@@ -394,7 +478,22 @@ def build(out: Path, days_ahead: int, fetch: bool) -> None:
                     events[e.key()] = e
             except (OSError, ValueError, KeyError, TypeError) as err:
                 sys.exit(f"NHL:n ohjelmatietojen haku epäonnistui: {err}")
+    if fetch:
+        for e in fetch_broadcast_sessions(days):
+            events[e.key()] = e
     for e in manual_events(manual):          # käsin syötetty voittaa lähteen
+        title = (e.title or {}).get("en", "")
+        tournament = re.split(r"[:|]|\s[–—-]\s", title, maxsplit=1)[0]
+        matching_sessions = [
+            key for key, auto in events.items()
+            if auto.tournament and auto.competition == e.competition
+            and norm(auto.tournament) == norm(tournament)
+            and abs(auto.start - e.start) <= timedelta(minutes=10)
+        ]
+        for key in matching_sessions:
+            session = events.pop(key)
+            e.extra_channels.update(session.extra_channels)
+            e.channel_starts = session.channel_starts | e.channel_starts
         previous = events.get(e.key())
         if previous and previous.competition == "nhl":
             e.extra_channels = previous.extra_channels
@@ -432,9 +531,8 @@ def build(out: Path, days_ahead: int, fetch: bool) -> None:
         per_day: dict[str, dict] = {}
         for e in all_events:
             comp = rights[e.competition]
-            chans = list(comp["broadcast"].get(code) or []) + [
-                c for c in e.extra_channels.get(code, []) if c not in (comp["broadcast"].get(code) or [])
-            ]
+            default_channels = [] if e.tournament else (comp["broadcast"].get(code) or [])
+            chans = list(dict.fromkeys([*default_channels, *e.extra_channels.get(code, [])]))
             chans = [c for c in chans if c in valid_channels]
             if not chans:
                 continue                      # ei lähetystä tässä maassa
